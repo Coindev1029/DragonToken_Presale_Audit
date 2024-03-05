@@ -8,7 +8,7 @@ Email: contact@DragonFireAvax.com
 */
 
 //$DRAGON is an ERC20 token that collects fees on transfers, and creates LP with other top community tokens
-
+//Base contract imports created with https://wizard.openzeppelin.com/ using their ERC20 with Permit, Ownable, and Votes.
 
 // SPDX-License-Identifier: MIT
 
@@ -4903,33 +4903,37 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
         address to,
         uint deadline
     ) external;
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
-        uint amountOutMin,
+
+     function swapExactETHForTokensSupportingFeeOnTransferTokens(
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
+        uint256 deadline
     ) external payable;
+
     function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
+        uint256 deadline
     ) external;
 }
 
 
 
 
-interface Ierc20Token {//generic ability to transfer out funds accidentally sent into the contract
+interface Ierc20Token { //Generic ability to transfer out funds accidentally sent into the contract
   function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
   function transfer(address to, uint256 amount) external returns (bool);
   function approve(address spender, uint256 amount) external returns (bool);
 }
 
+interface IProcessFees { //We give ourselves the option of a new processFees() function we might want to build later, with slippage protection or using V3 etc.
+    function processFeesExternal(uint256 swapToDRAGONLP, uint256 swapToCtLP) external returns (bool, string memory);
+}
 
-
-interface Ierc721Token {//generic ability to transfer out NFTs accidentally sent into the contract
+interface Ierc721Token { //Generic ability to transfer out NFTs accidentally sent into the contract
   function transferFrom(address from, address to, uint256 tokenId) external; 
   function safeTransferFrom(address from, address to, uint256 tokenId) external;
   function safeTransfer(address from, address to, uint256 tokenId) external;
@@ -5003,16 +5007,19 @@ Y88b 888888    888  888Y88b 888Y88..88P888  888
 contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
 
-    IUniswapV2Router02 public uniswapV2Router; //DEX router for swapping and making LP
+    IUniswapV2Router02 public uniswapV2Router; //DEX router for swapping Dragon and making all LP pairs on our own new dex
+    IUniswapV2Router02[] public uniswapV2Routers; //DEX routers for swapping AVAX for Community Tokens (aka CT) on other dexs
 
     address[] public communityTokens; //Array of CommunityTokens
+    address[] public ctRouters; //Array of CommunityTokens routers, so we can buy each CT on the dex with highest liquidity for it
 
     address public uniswapV2Pair; //Swap with this pair DRAGON/WAVAX
     address public deadAddress = 0x000000000000000000000000000000000000dEaD; //Burn LP by sending to to this address 
-    address public router; //Dex router
+    address public router; //Main Dragon LP dex router
     address public basePair; //Address of other token in our LP pair aka WAVAX, for DRAGON/WAVAX LP pairing
     address public treasuryAddress; //Team multisig
-    address public nftFarmAddress; //Farming rewards treasury
+    address public farmAddress; //Farming rewards treasury
+    address public externalFeesProcessor; //This gives an option to use an external feesProcessing() function we might build later with additional features
 
     bool private swapping; //Fees processing reentrancy guard
     bool public phasesInitialized; //Lock phases before IDO launch
@@ -5021,7 +5028,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     uint256 public communityLPFee; //LP fee divided over all CommunityTokens LP DRAGON/CT, will swap half from DRAGON to make LP
     uint256 public liquidityFee; //LP fee for DRAGON/WAVAX LP, will swap half from DRAGON to make LP
     uint256 public treasuryFee; //Team treasury fee, keep all as DRAGON
-    uint256 public farmNFTFee; //NFT farm fee, keep all as DRAGON
+    uint256 public farmFee; //Farm fee, keep all as DRAGON
     uint256 public totalFees; //Represented as basis points where 100 == 1%
     uint256 public totalPhases; //total count of whale limited phases and non-limited final phase
     uint256 public startTime; //Phases start time
@@ -5087,76 +5094,138 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     Ownable(msg.sender)
     { //This ERC20 constructor creates our DRAGON token name and symbol. 
       //After allowlist and phases initialization the owner will be set to a multisig 2/3 or 3/5, then later to a community run DAO
-        nftFarmAddress = msg.sender; //Update to multisig smart contract wallet until farm is ready
+        farmAddress = msg.sender; //Update to multisig smart contract wallet until farm is ready
         treasuryAddress = msg.sender;  //Update to multisig smart contract wallet
         communityLPFee = 500; //5%
         liquidityFee = 100; //1%
         treasuryFee = 100; //1%
-        farmNFTFee = 100; //1%
-        totalFees = communityLPFee + liquidityFee + treasuryFee + farmNFTFee;
+        farmFee = 100; //1%
+        totalFees = communityLPFee + liquidityFee + treasuryFee + farmFee;
         require(totalFees == 800, "Total fees must equal 8% at deployment");
         totalPhases = 8; //Last phase is the public non whale limited phase
         require(totalPhases > 0, "Total phases must be greater than 0");
         timePerPhase = 480; //Seconds per each phase, 8 minutes is 480 seconds
         require(timePerPhase > 0, "Time per phase must be greater than 0");
 
-        communityTokens = [
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846
-        ]; 
+        communityTokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
                        //Mainnet: 
-        /*0xab592d197ACc575D16C3346f4EB70C703F308D1E,
+        [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
         0x420FcA0121DC28039145009570975747295f2329,
         0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
         0xb5Cc2CE99B3f98a969DBe458b96a117680AE0fA1,
         0xc06E17bDC3F008F4Ce08D27d364416079289e729,
         0xA4F282457980856c36380174283d2CB278eA2B37,
         0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
-        0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7
-        ];*/    //FEED//COQ//KIMBO//LUCKY//DWC//RAIN//GGP//OSAK//
-        uint length_ = communityTokens.length; //Total number of community tokens
+        0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
+        //FEED//COQ//KIMBO//LUCKY//DWC//RAIN//GGP//OSAK//
+
+        uint256 length_ = communityTokens.length; //Total number of Community Tokens
         require(length_ > 0, "Contract must have at least one community token in rewardsToken array");
 
-        router = 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901; 
-        //TraderJoe router = C-Chain Mainnet: 0x60aE616a2155Ee3d9A68541Ba4544862310933d4 ; Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
-        basePair = 0xd00ae08403B9bbb9124bB305C09058E32C39A48c; 
+        //Choose dex router with best CT/AVAX liquidity for each CT
+        ctRouters = //[0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+                       //Mainnet: 
+        [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
+        
+        require(ctRouters.length == length_, "Each token in the communityTokens array must have a corresponding router in the ctRouters array");
+        IUniswapV2Router02 uniswapV2Router_;
+        address uniswapV2Pair_;
+        basePair = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
         //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; WAVAX Fuji Testnet: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(router);
 
-        address _uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2Router_ = IUniswapV2Router02(ctRouters[i]);
+            uniswapV2Routers.push(uniswapV2Router_);
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Routers[i].factory()).getPair(communityTokens[i], basePair);
+            require(uniswapV2Pair_ != address(0), "All CT/WAVAX LP Pairs must be created first and have some LP already, to buy CT with AVAX");
+        }
+
+        router = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; //Main Dragon/AVAX LP dex router, and DRAGON/CT LP router
+        //TraderJoe router = C-Chain Mainnet: 0x60aE616a2155Ee3d9A68541Ba4544862310933d4 ; Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+
+        uniswapV2Router_ = IUniswapV2Router02(router);
+
+        uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router_.factory())
             .createPair(address(this), basePair); //Initialize DRAGON/WAVAX LP pair, with 0 LP tokens in it to start with
 
-        uniswapV2Router = _uniswapV2Router; //Uses the interface created above
-        uniswapV2Pair = _uniswapV2Pair; //Uses the address created above
+        uniswapV2Router = uniswapV2Router_; //Uses the interface created above
+        uniswapV2Pair = uniswapV2Pair_; //Uses the address created above
 
         //ExcludeFromFees
         isExcludedFromFees[msg.sender] = true; //Owner is excluded from fees
         isExcludedFromFees[address(this)] = true; //This contract is excluded from fees
-        super._update(address(0), msg.sender, 88888888 * 10 ** decimals()); //Mint total supply to owner. Dev team makes LP and burns it before launch
-        swapTokensAtAmount = totalSupply() / (100000); //Minimum amount of fees collected in contract before we swap and burn, so users don't waste gas calling processFees.
+        super._update(address(0), msg.sender, 88888888 * 10 ** decimals()); //Mint total supply to owner. Dev team makes LP and burns it before launch.
+        swapTokensAtAmount = totalSupply() / (100000); //Minimum amount of fees collected in contract before we procesFees(), so users don't waste gas.
         require(swapTokensAtAmount > 0, "swapTokensAtAmount cannot be 0 wei,  totalSupply() is too low");
         emit SettingsChanged(msg.sender, "constructor");
     }
 
 
-    // Swap And Burn functions:
 
-    function setDex(address router_, address basePair_) external onlyOwner { //There is an inherent risk using a third party dex, so we have the ability to change dex.
-        router = router_; //TraderJoe router = C-Chain Mainnet: 0x60aE616a2155Ee3d9A68541Ba4544862310933d4 ; Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
-        basePair = basePair_; //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; WAVAX Fuji Testnet: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(router);
-        uniswapV2Router = _uniswapV2Router; //Uses the interface created above
-        address _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), basePair); //This pair must already exist
-        require(_uniswapV2Pair != address(0), 
-        "LP Pair must be created first, with a valid basePair_ input into the setDex function"); //An invalid LP pair or basePair_ will return 0 address
-        uniswapV2Pair = _uniswapV2Pair; //Set to pair grabbed from the factory call above
+    // Swap And Burn onlyOwner functions:
+
+
+    function setMainDex(address router_, address basePair_) external onlyOwner { 
+    //There is an inherent risk using a third party dex, so we have the ability to change dexs.
+        router = router_;
+        basePair = basePair_;
+        IUniswapV2Router02 uniswapV2Router_ = IUniswapV2Router02(router);
+        uniswapV2Router = uniswapV2Router_; //Uses the interface created above
+        address uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), basePair); //This pair must already exist
+        require(uniswapV2Pair_ != address(0), 
+        "LP Pair must be created first, with a valid basePair_ input into the setDex function"); //An invalid LP pair or basePair_ will return 0 address.
+        uniswapV2Pair = uniswapV2Pair_; //Set to pair grabbed from the factory call above
         uint256 length_ = communityTokens.length;
 
         for (uint256 i = 0; i < length_; i++){
-            _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
-            require(_uniswapV2Pair != address(0), "All CT/DRAGON LP Pairs must be created first");
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
+            require(uniswapV2Pair_ != address(0), "All CT/DRAGON LP Pairs must be created first on main dex, to create LPs on");
         }
 
-        emit SettingsChanged(msg.sender, "setDex");
+        emit SettingsChanged(msg.sender, "setMainDex");
+    }
+
+
+    function setCommunityTokens(address[] memory addresses_, address[] memory routers_) external onlyOwner{ 
+    //Set array of community tokens to buy and burn LP for, in case we need to change any.
+        communityTokens = addresses_;
+        uint256 length_ = communityTokens.length;
+        require(length_ > 0, "Must include at least one community token");
+        address uniswapV2Pair_;
+
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
+            require(uniswapV2Pair_ != address(0), "All CT/DRAGON LP Pairs must be created first on main dex");
+        }
+        
+        setCtRouters(routers_);
+        emit SettingsChanged(msg.sender, "setCommunityTokens");
+    }
+
+
+    function setCtRouters(address[] memory routers_) public onlyOwner { //Can change each dex we buy CT on, to use dex with most LP per CT
+        ctRouters = routers_;
+        uint256 length_ = communityTokens.length;
+        require(ctRouters.length == length_, "Each token in the communityTokens array must have a corresponding router in the ctRouters array");
+        address uniswapV2Pair_;
+        IUniswapV2Router02 uniswapV2RouterCT_;
+        uniswapV2Routers = new IUniswapV2Router02[](length_); //Reset the old array and make size of new length
+
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2RouterCT_ = IUniswapV2Router02(routers_[i]);
+            uniswapV2Routers[i] = uniswapV2RouterCT_;
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Routers[i].factory()).getPair(communityTokens[i], basePair);
+            require(uniswapV2Pair_ != address(0), "All CT/WAVAX LP Pairs must be created first on tertiary dexs, to buy CT with AVAX");
+        }
+
+        emit SettingsChanged(msg.sender, "setCtRouters");
     }
 
 
@@ -5164,21 +5233,6 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
         require(amount_ > totalSupply() / 1000000, "Amount too low, cannot be less than a millionth of supply"); 
         swapTokensAtAmount = amount_;
         emit SettingsChanged(msg.sender, "setSwapTokensAtAmount");
-    }
-
-
-    function setCommunityTokens(address[] memory addresses_) external onlyOwner{ //Set array of community tokens to buy and burn LP for, in case we need to change any.
-        communityTokens = addresses_;
-        uint256 length_ = communityTokens.length;
-        require(length_ > 0, "Must include at least one community token");
-        address _uniswapV2Pair;
-
-        for (uint256 i = 0; i < length_; i++){
-            _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
-            require(_uniswapV2Pair != address(0), "All CT/DRAGON LP Pairs must be created first");
-        }
-
-        emit SettingsChanged(msg.sender, "setCommunityTokens");
     }
 
 
@@ -5190,10 +5244,10 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     }
 
 
-    function setFarmAddress(address farm_) external onlyOwner{ //Set address for NFT farm rewards collection
+    function setFarmAddress(address farm_) external onlyOwner{ //Set address for farm rewards collection
         require(farm_ != address(0), "Cannot set to 0 address");
         excludeFromFees(farm_);
-        nftFarmAddress = farm_;
+        farmAddress = farm_;
         emit SettingsChanged(msg.sender, "setFarmAddress");
     }
 
@@ -5218,18 +5272,23 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
         super.transferOwnership(newOwner_);
     }
 
+    function setExternalFeesProcessor(address contract_) external onlyOwner {  //Set to the 0 address again to revert this change
+        externalFeesProcessor = contract_;
+        emit SettingsChanged(msg.sender, "setExternalFeesProcessor");
+    }
+
 
     function setFeesInBasisPts( //Set transfer fees in basis points where 100 = 1%
         uint256 communityLPFee_, 
         uint256 liquidityFee_, 
         uint256 treasuryFee_, 
-        uint256 farmNFTFee_
+        uint256 farmFee_
         ) external onlyOwner {
         communityLPFee = communityLPFee_; //LP burn fee to be divided over all community tokens
         liquidityFee = liquidityFee_; //LP fee for DRAGON token LP
         treasuryFee = treasuryFee_; //Team treasury fee
-        farmNFTFee = farmNFTFee_; //NFT farm fee 
-        totalFees = communityLPFee + liquidityFee + treasuryFee + farmNFTFee; 
+        farmFee = farmFee_; //Farm fee 
+        totalFees = communityLPFee + liquidityFee + treasuryFee + farmFee; 
         require(totalFees <= 800, "Total fees cannot add up to over 8%");
         emit SettingsChanged(msg.sender, "setFeesInBasisPts");
     }    
@@ -5249,18 +5308,23 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
             return;
         }
 
-        beforeTokenTransfer(from_, to_, amount_); //Call whale limited and timed phases check
-        bool takeFee_ = !swapping; //Don't charge fees during processFees()
+        if (from_ == externalFeesProcessor
+        || to_ == externalFeesProcessor
+        || from_ == address(this)
+        || to_ == address(this)
+        ) { //Don't limit fees processing
+            super._update(from_, to_, amount_);
+            return;
+        }
         
-        if (swapping && from_ != address(this)) { //Block users during processFees(), in case of reentrant user trying to avoid fees or phases restrictions
+        if (swapping) { //Block users during processFees(), in case of reentrant user trying to avoid fees or phases restrictions
             revert("User cannot trade in the middle of a fees processing transaction. You have created a reentrancy issue");
         }
 
-        if (tradingPhase() == 0) { //Don't charge fees when adding LP before launch
-            takeFee_ = false;
-        }
+        beforeTokenTransfer(from_, to_, amount_); //Call whale limited and timed phases check
+        bool takeFee_ = true; 
 
-        if (isExcludedFromFees[from_] || isExcludedFromFees[to_]) {
+        if (tradingPhase() == 0 || isExcludedFromFees[from_] || isExcludedFromFees[to_]) { //Don't charge fees when adding LP before launch
             takeFee_ = false;
         }
 
@@ -5269,16 +5333,15 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
             amount_ = amount_ - fees_;
             super._update(from_, address(this), fees_); //Send 8% transfer fee to this contract
         }
-        
-        super._update(from_, to_, amount_); //Send the original transfer requested by user, minus fees
 
-        if (to_ == uniswapV2Pair){
+        if (to_ == uniswapV2Pair){ //Only force processFees() on a user's sells (and incidentally LP additions), before their transfer is completed
             uint256 phase_ = tradingPhase();
-            if (phase_ != totalPhases && phase_ != 0) { 
-                //Call processFees() on all sells and LP additions, during whale limited phases, to keep fees from collecting too much at launch.
+            if (phase_ != totalPhases && phase_ != 0) { //Only force processFees() during whale limited phases, to keep fees from collecting too much at launch.
                 processFees();
             }
         }
+
+        super._update(from_, to_, amount_); //Send the original transfer requested by user, minus fees
     }
 
 
@@ -5287,10 +5350,6 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
         address to_,
         uint256 amount_
     ) private {
-
-        if (swapping){ //Don't restrict processFees()
-            return;
-        }
 
         if (phasesInitialized == false) {
             //If phases not done being initialized then only allow owner transfers or LP creation
@@ -5304,12 +5363,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
             return;
         }
 
-        if (
-            to_ != uniswapV2Pair 
-            && to_ != address(this) 
-            && from_ != address(this) 
-        ) { 
-        //Don't limit lp creation, selling, or any possible fees coming into or out of the contract
+        if (to_ != uniswapV2Pair && from_ != owner() && to_ != owner()) { //Don't limit LP creation or selling
 
             if (tradingPhase_ == 0) {
                 revert("Trading phases have not yet started; You are too early");
@@ -5331,7 +5385,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
         uint256 initialAVAXBalance_ = address(this).balance; //Balance before swap for AVAX, for more accurate calculations later
         uint256 halfDRAGONTokens_ = totalDRAGONTokens_ / 2;
-        _approve(address(this), address(uniswapV2Router), totalDRAGONTokens_); //Approve router to swap our DRAGON tokens and make LP
+        _approve(address(this), address(uniswapV2Router), totalDRAGONTokens_); //Approve main router to swap our DRAGON tokens and make LP
         swapDRAGONForAVAX(halfDRAGONTokens_); //Swap half the DRAGON tokens to AVAX
         uint256 newAVAXBalance_ = address(this).balance - initialAVAXBalance_; //This is the amount of AVAX received from the swap, (or more if someone sent in extra).
 
@@ -5350,7 +5404,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
             for (uint256 i = 0; i < ctLength_; i++){ //Loop for each CT
                 uint256 initialCtBalance_ = IERC20(communityTokens[i]).balanceOf(address(this));
-                swapAvaxForCT(avaxPerCt_, communityTokens[i]);
+                swapAvaxForCT(avaxPerCt_, i);
                 uint256 newCtBalance_ = IERC20(communityTokens[i]).balanceOf(address(this)) - initialCtBalance_;
                 addLiquidityCT(DRAGONPerCtLP_, newCtBalance_, communityTokens[i]);
                 emit SwapAndLiquify(DRAGONPerCtLP_, newCtBalance_, communityTokens[i]);
@@ -5365,7 +5419,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
         path[1] = basePair; //WAVAX
 
         try
-        uniswapV2Router.swapExactTokensForAVAXSupportingFeeOnTransferTokens( //DRAGON to AVAX swap
+        uniswapV2Router.swapExactTokensForAVAXSupportingFeeOnTransferTokens( //DRAGON to AVAX swap on main dex
             tokenAmount_,
             100, //Infinite slippage basically since it's in wei
             path,
@@ -5379,13 +5433,13 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     }
 
 
-    function swapAvaxForCT(uint256 avaxAmount_, address addressCT_) private {
+    function swapAvaxForCT(uint256 avaxAmount_, uint256 index_) private {
         address[] memory path = new address[](2); //Our swap path WAVAX/CT
         path[0] = basePair; //WAVAX
-        path[1] = addressCT_; //CT
+        path[1] = communityTokens[index_]; //CT
 
         try  
-        uniswapV2Router.swapExactAVAXForTokensSupportingFeeOnTransferTokens //AVAX to CT swap
+        uniswapV2Routers[index_].swapExactAVAXForTokensSupportingFeeOnTransferTokens //AVAX to CT, swap on dex router with most LP
         {value: avaxAmount_}(
             100, //Infinite slippage basically since it's in wei
             path,
@@ -5401,7 +5455,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
     function addLiquidityDRAGON(uint256 tokenAmount_, uint256 AVAXAmount_)  private { //Make and burn LP tokens DRAGON/WAVAX
         try  
-        uniswapV2Router.addLiquidityAVAX{value: AVAXAmount_}( //Amount of AVAX to send for LP
+        uniswapV2Router.addLiquidityAVAX{value: AVAXAmount_}( //Amount of AVAX to send for LP on main dex
             address(this),
             tokenAmount_,
             100, //Infinite slippage basically since it's in wei
@@ -5416,7 +5470,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     }
 
 
-    function addLiquidityCT(uint256 DRAGONAmount_, uint256 ctAmount_, address ctAddress_)  private {  //Make and burn LP tokens DRAGON/CT
+    function addLiquidityCT(uint256 DRAGONAmount_, uint256 ctAmount_, address ctAddress_)  private {  //Make and burn LP tokens DRAGON/CT on main dex
         //Approve token transfer for router to make LP
         IERC20(ctAddress_).approve(address(uniswapV2Router), ctAmount_);
 
@@ -5455,6 +5509,15 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
     }
 
 
+    function externalFeesProcessing(uint256 swapToDRAGONLP_, uint256 swapToCtLP_) internal { //If we set an external fees processing contract, then we call it here
+        _approve(address(this), externalFeesProcessor, (swapToDRAGONLP_ + swapToCtLP_)); //Approve external fees processor to swap our DRAGON tokens and make LP
+
+        (bool success_, string memory error_) = IProcessFees(externalFeesProcessor).processFeesExternal(swapToDRAGONLP_, swapToCtLP_);
+
+        require(success_, error_);
+    }
+
+
 
     //Public functions:
 
@@ -5466,7 +5529,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
             require(totalFees > 0, "Total fees are set to 0%; Cannot process due to divide by 0 error");
             swapping = true; //Reentrancy guard
             uint256 swapToDRAGONLP_ = (contractDRAGONBalance_ * liquidityFee) / totalFees; //Calculate DRAGON LP fee portion
-            uint256 farmTokens_ = (contractDRAGONBalance_ * farmNFTFee) / totalFees; //Calculate NFT farm fee portion
+            uint256 farmTokens_ = (contractDRAGONBalance_ * farmFee) / totalFees; //Calculate farm fee portion
             uint256 treasuryTokens_ = (contractDRAGONBalance_ * treasuryFee) / totalFees; //Calculate treasury fee portion
             uint256 swapToCtLP_ = (contractDRAGONBalance_ * communityLPFee) / totalFees; //Calculate community tokens LP fee portion
 
@@ -5475,10 +5538,15 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
             }
 
             if (farmTokens_ > 0){
-            super._update(address(this), nftFarmAddress, farmTokens_); //Send fees to NFT farm
+                super._update(address(this), farmAddress, farmTokens_); //Send fees to farm
             }
 
-            swapAndBurnLP(swapToDRAGONLP_, swapToCtLP_);
+            if (externalFeesProcessor != address(0)) { //If we have added an external fees processing contract then use that instead
+                externalFeesProcessing(swapToDRAGONLP_,swapToCtLP_);
+            } else {
+                swapAndBurnLP(swapToDRAGONLP_, swapToCtLP_);
+            }
+
             swapping = false; //Reentrancy guard
             uint256 newDRAGONBalance_ = balanceOf(address(this)); //Calculate any dust leftover from CT LP creation
             emit ProcessFees(msg.sender, (contractDRAGONBalance_ - newDRAGONBalance_)); //Amount of DRAGON fees processed minus any dust leftover
@@ -5495,12 +5563,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
 
     //The following function is an override required by Solidity due to multiple inheritance:
-    function nonces(address owner)
-        public
-        view
-        override(ERC20Permit, Nonces)
-        returns (uint256)
-    {
+    function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
         return super.nonces(owner);
     }
 
@@ -5536,7 +5599,7 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
 
 
-    //Owner Sets Phases:
+    //Set Phases onlyOwner:
 
 
     function setPhasesStartTime(uint256 startTime_) external onlyOwner {
@@ -5570,8 +5633,8 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
         emit SettingsChanged(msg.sender, "lockPhasesSettings");
     }
 
+
     function setAllowlistedForSomePhase(address[] memory users_, uint256 phase_) external onlyOwner {
-    //Example input: ["0xeC21aFC2DF6E3924eb5E71e3b383B359A1Bb5797","0xc7952F9e71F8866FBb5D57B0cBdA3eCefEAB8F60","0xb886B99ee96Ade23A803E310F33DE94FE0145689"]
         for (uint256 i = 0; i < users_.length; i++) {
             allowlisted[users_[i]] = phase_;
         }
@@ -5582,60 +5645,61 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
     //Fallback function and generic transfer functions to handle any tokens that come into contract:
 
+
     fallback() external payable {}
 
     receive() external payable {}
 
-    function withdrawAvaxTo(address payable _to, uint _amount) external onlyOwner {
-        _to.transfer(_amount); //Can only send Avax from our contract, any user's wallet is safe
-        emit AvaxWithdraw(_to, _amount);
+    function withdrawAvaxTo(address payable to_, uint256 amount_) external onlyOwner {
+        to_.transfer(amount_); //Can only send Avax from our contract, any user's wallet is safe
+        emit AvaxWithdraw(to_, amount_);
     }
 
-    function Ierc20TokenTransferFrom(address _contract, address _to, uint256 _amount) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc20Token(_contract).transferFrom(address(this), _to, _amount); //Can only transfer from our own contract
-        emit TokenWithdraw(_to, _amount, _contract);
+    function Ierc20TokenTransferFrom(address contract_, address to_, uint256 amount_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc20Token(contract_).transferFrom(address(this), to_, amount_); //Can only transfer from our own contract
+        emit TokenWithdraw(to_, amount_, contract_);
     }
 
-    function Ierc20TokenTransfer(address _contract, address _to, uint256 _amount) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc20Token(_contract).transfer(_to, _amount); //Since interfaced contract looks at msg.sender then this can only send from our own contract
-        emit TokenWithdraw(_to, _amount, _contract);
+    function Ierc20TokenTransfer(address contract_, address to_, uint256 amount_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc20Token(contract_).transfer(to_, amount_); //Since interfaced contract looks at msg.sender then this can only send from our own contract
+        emit TokenWithdraw(to_, amount_, contract_);
     }
 
-    function Ierc20TokenApprove(address _contract, address _spender, uint256 _amount) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc20Token(_contract).approve(_spender, _amount); //Since interfaced contract looks at msg.sender then this can only send from our own contract
-        emit TokenApproved(_spender, _amount, _contract);
+    function Ierc20TokenApprove(address contract_, address spender_, uint256 amount_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc20Token(contract_).approve(spender_, amount_); //Since interfaced contract looks at msg.sender then this can only send from our own contract
+        emit TokenApproved(spender_, amount_, contract_);
     }
 
 
-    function Ierc721TokenGenericTransferFrom(address _contract, address _to, uint256 _tokenId) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc721Token(_contract).transferFrom(address(this), _to, _tokenId); //Can only transfer from our own contract
-        emit NFTWithdraw(_to, _tokenId, _contract);
+    function Ierc721TokenGenericTransferFrom(address contract_, address to_, uint256 tokenId_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc721Token(contract_).transferFrom(address(this), to_, tokenId_); //Can only transfer from our own contract
+        emit NFTWithdraw(to_, tokenId_, contract_);
     }
 
-    function Ierc721TokenGenericSafeTransferFrom(address _contract, address _to, uint256 _tokenId) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc721Token(_contract).safeTransferFrom(address(this), _to, _tokenId); //Can only transfer from our own contract
-        emit NFTWithdraw(_to, _tokenId, _contract);
+    function Ierc721TokenGenericSafeTransferFrom(address contract_, address to_, uint256 tokenId_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc721Token(contract_).safeTransferFrom(address(this), to_, tokenId_); //Can only transfer from our own contract
+        emit NFTWithdraw(to_, tokenId_, contract_);
     }
 
-    function Ierc721TokenGenericTransfer(address _contract, address _to, uint256 _tokenId) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc721Token(_contract).transfer( address(this), _to, _tokenId); //Can only transfer from our own contract
-        emit NFTWithdraw(_to, _tokenId, _contract);
+    function Ierc721TokenGenericTransfer(address contract_, address to_, uint256 tokenId_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc721Token(contract_).transfer( address(this), to_, tokenId_); //Can only transfer from our own contract
+        emit NFTWithdraw(to_, tokenId_, contract_);
     }
 
-    function Ierc721TokenGenericSafeTransferData(address _contract, address _to, uint256 _tokenId) external onlyOwner {
-        noDRAGONTokens(_contract);  //Cannot transfer DRAGON tokens
-        Ierc721Token(_contract).safeTransfer( address(this), _to, _tokenId); //Can only transfer from our own contract
-        emit NFTWithdraw(_to, _tokenId, _contract);
+    function Ierc721TokenGenericSafeTransferData(address contract_, address to_, uint256 tokenId_) external onlyOwner {
+        noDRAGONTokens(contract_);  //Cannot transfer DRAGON tokens
+        Ierc721Token(contract_).safeTransfer( address(this), to_, tokenId_); //Can only transfer from our own contract
+        emit NFTWithdraw(to_, tokenId_, contract_);
     }
 
-    function noDRAGONTokens(address _contract)  internal view {
-        require(_contract != address(this), "Owner cannot withdraw $DRAGON token fees collected"); //No $DRAGON tokens, as they are earmarked for fees processing
+    function noDRAGONTokens(address contract_)  internal view {
+        require(contract_ != address(this), "Owner cannot withdraw $DRAGON token fees collected"); //No $DRAGON tokens, as they are earmarked for fees processing
         require(!swapping, "Owner cannot withdraw while fees are processing"); //Reentrancy guard prevents CT tokens being removed during fees processing
     }
 
@@ -5670,20 +5734,21 @@ contract Dragon is ERC20, ERC20Permit, ERC20Votes, Ownable {
 
 
 
-
 /*
    Launch instructions:
+Set values in the constructor.
 Deploy contract with solidity version: 0.8.24, EVM version: Paris, and runs optimized: 200.
 Verify contract.
-Initialize phases startTime for some future time, set whale limits per phase, and finally lock phases.
-Set allowlists for each phase.
-Add main LP as DRAGON/AVAX pair.
-Add some LP for DRAGON/CT pairs.
+Set allowlists that we have so far for each phase.
+Approve main router and add main LP as DRAGON/AVAX pair.
+Approve tertiary routers and add some LP for DRAGON/CT pairs.
+Burn all LP tokens. All DRAGON tokens are now in LP, there are no initial team tokens or other initial distributions.
+Initialize phases startTime for some future time, set whale limits per phase, and finally ***lock phases***.
 Set socials on block explorer and dexscreener.
 Transfer contract ownership to multisig, requiring multiple signatures per transaction, where each signer is a unique person and wallet and device.
-Burn all LP tokens. All DRAGON tokens are now in LP, there are no initial team tokens or other initial distributions.
-Release medium article showing tokenomics, audit report, LP burnt, contract address, multisig address, and multisig signer addresses.
-IDO launch after marketing.
+Release medium article showing tokenomics, audit report, DEXs, LP burnt, contract address, farm collection address, treasury address, and multisig signer addresses.
+IDO launch after marketing and bonus allowlist gathered and input.
 Later, transfer contract ownership to a community run and owned DAO, possibly with 48hr timelocks in effect, which might use the OpenZeppelin Defender voting system.
 Bug bounty could be good to set up on https://www.sherlock.xyz/ or https://code4rena.com/ or similar.
+Optional future upgrade of processFees() to external contract that implements slippage protections, V3 LP, or other features.
 */
