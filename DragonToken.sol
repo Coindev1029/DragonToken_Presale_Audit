@@ -919,8 +919,6 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
 
 
-
-
   //Legal Disclaimer: 
 // DragonFire (DRAGON) is a meme coin (also known as a community token) created for entertainment purposes only. 
 //It holds no intrinsic value and should not be viewed as an investment opportunity or a financial instrument.
@@ -940,6 +938,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
 // By interacting with DRAGON or participating in its associated activities, 
 //users acknowledge and accept the inherent risks involved and agree to hold harmless the creators and developers of DRAGON from any liabilities or losses incurred.
+
 
 
 
