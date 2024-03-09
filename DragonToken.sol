@@ -24,11 +24,6 @@ interface IUniswapV2Factory {
 }
 
 
-interface IUniswapV2Pair {   
-    function factory() external view returns (address);
-}
-
-
 interface IUniswapV2Router01 {
     function factory() external pure returns (address);
     function addLiquidity(
