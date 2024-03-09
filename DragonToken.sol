@@ -755,7 +755,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
                 super._update(address(this), farmAddress, farmTokens_); //Send fees to farm
             }
 
-            if (externalFeesProcessor != address(0)) { //If we have added an external fees processing contract then use that instead
+            if (externalFeesProcessor != address(0) && tradingPhase() == TOTAL_PHASES) { //If we have added an external fees processing contract then use that instead
                 externalFeesProcessing(swapToDRAGONLP_,swapToCtLP_);
             } else {
                 swapAndBurnLP(swapToDRAGONLP_, swapToCtLP_);
