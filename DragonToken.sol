@@ -7,7 +7,7 @@ Website: www.DragonFireAvax.com
 Email: contact@DragonFireAvax.com
 */
 
-//$DRAGON is an ERC20 token that collects fees on transfers, and creates LP with itself and other top community tokens.
+//$DRAGON is an ERC20 token that collects fees on transfers, and creates LP with other top community tokens.
 //Base contract imports created with https://wizard.openzeppelin.com/ using their ERC20 with Permit and Ownable.
 
 
@@ -185,7 +185,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
     uint256 public constant TOTAL_SUPPLY_WEI = 88888888000000000000000000; //88,888,888 DRAGON
 
     address public constant DEAD = 0x000000000000000000000000000000000000dEaD; //Burn LP by sending it to this address 
-    address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
+    address public constant WAVAX = 0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8; 
     //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
 
@@ -213,6 +213,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
     uint256 public startTime; //Phases start time
     uint256 public lastTimeCalled; //Last time processFees was called
 
+    mapping (address => bool) public dragonCtPairs; //Track LP pairs for DRAGON/CT
     mapping (address => bool) public approvedRouters; //Approved routers for buying CT with AVAX and making LP
     mapping (address => bool) public isExcludedFromFees; //Swap fees exclusion list
     mapping (address => uint256) public allowlisted; //Allowlist for gated phases
@@ -297,8 +298,8 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         totalFees = communityLPFee + liquidityFee + treasuryFee + farmFee;
         require(totalFees == 800, "Total fees must equal 8% at deployment");
 
-        communityTokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
-                       //Mainnet: 
+        communityTokens = [0xD7ACd2a9FD159E69Bb102A1ca21C9a3e3A5F771B]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+/*                       //Mainnet: 
         [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
         0x420FcA0121DC28039145009570975747295f2329,
         0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
@@ -308,14 +309,14 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
         0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
         //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-
+*/
         uint256 length_ = communityTokens.length; //Total number of Community Tokens
         require(length_ > 0, "Contract must have at least one community token in rewardsToken array");
 
         //Choose dex router with best CT/AVAX liquidity for each CT
-        ctRouters = //[0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+        ctRouters = [0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
                        //Mainnet: 
-        [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+/*      [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -323,7 +324,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-        
+*/
         require(ctRouters.length == length_, "Each token in the communityTokens array must have a corresponding router in the ctRouters array");
         IUniswapV2Router02 uniswapV2Router_;
         address uniswapV2Pair_;
@@ -339,7 +340,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
             require(uniswapV2Pair_ != address(0), "All CT/WAVAX LP Pairs must be created first and have some LP already, to buy CT with AVAX");
         }
 
-        routerLP = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; //Main Dragon/AVAX LP and DRAGON/CT LP dex router
+        routerLP = 0xf8e81D47203A594245E36C48e151709F0C19fBe8; //Main Dragon/AVAX LP and DRAGON/CT LP dex router
         //TraderJoe router = C-Chain Mainnet: 0x60aE616a2155Ee3d9A68541Ba4544862310933d4 ; Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
         
         uniswapV2Router_ = IUniswapV2Router02(routerLP);
@@ -372,13 +373,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         require(uniswapV2Pair_ != address(0), 
         "LP Pair must be created first, paired with WAVAX"); //An invalid LP pair will return 0 address.
         uniswapV2Pair = uniswapV2Pair_; //Set to pair grabbed from the factory call above
-        uint256 length_ = communityTokens.length;
-
-        for (uint256 i = 0; i < length_; i++){
-            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
-            require(uniswapV2Pair_ != address(0), "All CT/DRAGON LP Pairs must be created first on main dex, to create LPs on");
-        }
-
+        checkCtPairs();
         emit SettingsChanged(msg.sender, "setMainDex");
     }
 
@@ -389,13 +384,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         require(length_ > 0, "Must include at least one community token");
         require(length_ <= 8, "Cannot include more than 8 tokens in the communityTokens array"); //Prevent out of gas errors
         communityTokens = addresses_;
-        address uniswapV2Pair_;
-
-        for (uint256 i = 0; i < length_; i++){
-            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
-            require(uniswapV2Pair_ != address(0), "All CT/DRAGON LP Pairs must be created first on main dex");
-        }
-        
+        checkCtPairs();        
         setCtRouters(routers_);
         emit SettingsChanged(msg.sender, "setCommunityTokens");
     }
@@ -496,6 +485,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
     //Internal functions:
 
+
     function _update( //Fees added on to all transfers, and phases check
         address from_,
         address to_,
@@ -509,13 +499,13 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
         if (from_ == address(this)
         || to_ == address(this)
-        ) { //Don't limit fees processing
+        ) { //Don't limit fees processing or LP creation
             super._update(from_, to_, amount_);
             return;
         }
         
         if (swapping) { //Block users during processFees(), in case of reentrant user calls
-            revert("User cannot trade in the middle of a fees processing transaction. You have created a reentrancy issue");
+            revert("User cannot trade in the middle of internal LP creation. You have created a reentrancy issue");
         }
 
         beforeTokenTransfer(to_, amount_); //Whale limited and timed phases check
@@ -552,7 +542,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
             return;
         }
 
-        if (to_ != uniswapV2Pair) { //Do not limit LP creation or selling
+        if (to_ != uniswapV2Pair && !dragonCtPairs[to_]) { //Do not limit LP creation or selling
             require(allowlisted[to_] <= tradingPhase_, "Not allowlisted for current phase");
             totalPurchased[to_] += amount_; //Total amount user received in whale limited phases
             require(totalPurchased[to_] <= maxWeiPerPhase[tradingPhase_], "Receiving too much for current whale limited phase");
@@ -672,6 +662,15 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
     }
 
 
+    function checkCtPairs() internal view {
+        uint256 length_ = communityTokens.length;
+        address uniswapV2Pair_;
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
+            require(uniswapV2Pair_ != address(0), "All CT/DRAGON LP Pairs must be created first on main dex");
+        }
+    }
+
 
     //Public functions:
 
@@ -735,7 +734,47 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         }
     }
 
+
+    function seedAndBurnCtLP(uint256 ctIndex_, address communityToken_, uint256 amountDragon_, uint256 amountCt_) external {
+        require(communityTokens[ctIndex_] == communityToken_, "Token not found in communityTokens array at that index"); //Verify valid CT address
+        require(amountDragon_ > 100000000000000000, "Must send at least 0.1 Dragon tokens");
+        require(amountCt_ > 100000000000000000, "Must send at least 0.1 Community tokens");
+        require(!swapping, "Already making CT LP, you have created a reentrancy issue");
+        swapping = true; //Reentrancy block
+        transfer(address(this), amountDragon_);
+        IERC20(communityToken_).transferFrom(msg.sender, address(this), amountCt_); //User must first approve this contract to spend their CT tokens
+        _approve(address(this), address(uniswapV2Router), amountDragon_); //Approve main router to use our DRAGON tokens and make LP
+        addLiquidityCT(amountDragon_, amountCt_, communityToken_);
+        swapping = false;
+    }
     
+
+    function seedAndBurnDragonLP(uint256 amountDragon_, uint256 amountAvax_) external payable{
+        require(msg.value == amountAvax_, "Different amount of Avax sent than indicated in call values"); //Verify intended amount sent
+        require(amountDragon_ >= 100000000000000000, "Must send at least 0.1 Dragon tokens");
+        require(amountAvax_ >= 100000000000000000, "Must send at least 0.1 AVAX");
+        require(!swapping, "Already making Dragon LP, you have created a reentrancy issue");
+        swapping = true; //Reentrancy block
+        transfer(address(this), amountDragon_);
+        _approve(address(this), address(uniswapV2Router), amountDragon_); //Approve main router to use our DRAGON tokens and make LP
+        addLiquidityDRAGON(amountDragon_, amountAvax_);
+        swapping = false;
+    }
+    
+
+    function setPairs() external {
+        uint256 length_ = communityTokens.length;
+        address uniswapV2Pair_;
+
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
+            if (!dragonCtPairs[uniswapV2Pair_]) {
+                dragonCtPairs[uniswapV2Pair_] = true;
+            }
+        }
+    }
+
+
     function tradingActive() public view returns (bool) { //Check if startTime happened yet to open trading
         if (startTime > 0) {
             return block.timestamp >= startTime; //Return true if phases is set and has started
@@ -794,6 +833,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
     function lockPhasesSettings() external onlyOwner phasesLock{ //Phases initialization cannot be unlocked after it is locked
         require(startTime >= block.timestamp, "startTime must be set for the future");
         require(maxWeiPerPhase[1] > 0 , "Whale limited phases maxWeiPerPhase must be greater than 0");
+        checkCtPairs();
         phasesInitialized = true; //Lock these phases settings
         emit SettingsChanged(msg.sender, "lockPhasesSettings");
     }
