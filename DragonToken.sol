@@ -185,7 +185,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
     uint256 public constant TOTAL_SUPPLY_WEI = 88888888000000000000000000; //88,888,888 DRAGON
 
     address public constant DEAD = 0x000000000000000000000000000000000000dEaD; //Burn LP by sending it to this address 
-    address public constant WAVAX = 0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8; 
+    address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
     //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
 
@@ -298,8 +298,8 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         totalFees = communityLPFee + liquidityFee + treasuryFee + farmFee;
         require(totalFees == 800, "Total fees must equal 8% at deployment");
 
-        communityTokens = [0xD7ACd2a9FD159E69Bb102A1ca21C9a3e3A5F771B]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
-/*                       //Mainnet: 
+        communityTokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+                       //Mainnet: 
         [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
         0x420FcA0121DC28039145009570975747295f2329,
         0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
@@ -309,14 +309,14 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
         0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
         //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-*/
+
         uint256 length_ = communityTokens.length; //Total number of Community Tokens
         require(length_ > 0, "Contract must have at least one community token in rewardsToken array");
 
         //Choose dex router with best CT/AVAX liquidity for each CT
-        ctRouters = [0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+        ctRouters = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
                        //Mainnet: 
-/*      [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+        [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -324,7 +324,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-*/
+
         require(ctRouters.length == length_, "Each token in the communityTokens array must have a corresponding router in the ctRouters array");
         IUniswapV2Router02 uniswapV2Router_;
         address uniswapV2Pair_;
@@ -340,7 +340,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
             require(uniswapV2Pair_ != address(0), "All CT/WAVAX LP Pairs must be created first and have some LP already, to buy CT with AVAX");
         }
 
-        routerLP = 0xf8e81D47203A594245E36C48e151709F0C19fBe8; //Main Dragon/AVAX LP and DRAGON/CT LP dex router
+        routerLP = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; //Main Dragon/AVAX LP and DRAGON/CT LP dex router
         //TraderJoe router = C-Chain Mainnet: 0x60aE616a2155Ee3d9A68541Ba4544862310933d4 ; Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
         
         uniswapV2Router_ = IUniswapV2Router02(routerLP);
