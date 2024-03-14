@@ -7,7 +7,7 @@ Website: www.DragonFireAvax.com
 Email: contact@DragonFireAvax.com
 */
 
-//$DRAGON is an ERC20 token that collects fees on transfers, and creates LP with other top community tokens.
+//$DRAGON is an ERC20 token that collects fees on transfers, and creates LP with itself and other top community tokens.
 //Base contract imports created with https://wizard.openzeppelin.com/ using their ERC20 with Permit and Ownable.
 
 
