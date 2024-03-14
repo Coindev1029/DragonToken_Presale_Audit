@@ -354,6 +354,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         isExcludedFromFees[msg.sender] = true; //Owner is excluded from fees
         isExcludedFromFees[address(this)] = true; //This contract is excluded from fees
 
+        processFeesMinimum = TOTAL_SUPPLY_WEI / 10000; //Must collect 0.01% of supply in fees before can swap, to save user's gas
         super._update(address(0), msg.sender, TOTAL_SUPPLY_WEI); //Mint total supply to LP creator. They will make LP with 100% of supply and burn LP to the DEAD address
         emit SettingsChanged(msg.sender, "constructor");
     }
