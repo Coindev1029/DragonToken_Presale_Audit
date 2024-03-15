@@ -354,8 +354,8 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         isExcludedFromFees[msg.sender] = true; //Owner is excluded from fees
         isExcludedFromFees[address(this)] = true; //This contract is excluded from fees
 
-        processFeesMinimum = TOTAL_SUPPLY_WEI / 10000; //Must collect 0.01% of supply in fees before can swap, to save user's gas
         super._update(address(0), msg.sender, TOTAL_SUPPLY_WEI); //Mint total supply to LP creator. They will make LP with 100% of supply and burn LP to the DEAD address
+        processFeesMinimum = TOTAL_SUPPLY_WEI / 10000; //Must collect 0.01% of supply in fees before can swap, to save user's gas
         emit SettingsChanged(msg.sender, "constructor");
     }
 
@@ -480,6 +480,20 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         require(!feesLocked, "Fees settings already locked");
         feesLocked = true;
         emit SettingsChanged(msg.sender, "lockFeeSettings");
+    }
+
+
+    function setPairs() external onlyOwner{
+        uint256 length_ = communityTokens.length;
+        address uniswapV2Pair_;
+
+        for (uint256 i = 0; i < length_; i++){
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
+            if (!dragonCtPairs[uniswapV2Pair_] && uniswapV2Pair_ != address(0)) {
+                dragonCtPairs[uniswapV2Pair_] = true;
+            }
+        }
+        emit SettingsChanged(msg.sender, "setPairs");
     }
 
 
@@ -737,6 +751,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
 
     function seedAndBurnCtLP(uint256 ctIndex_, address communityToken_, uint256 amountDragon_, uint256 amountCt_) external {
+        require(tradingPhase() != TOTAL_PHASES, "Phases are completed already"); //This function is just to seed LP for IDO launch
         require(communityTokens[ctIndex_] == communityToken_, "Token not found in communityTokens array at that index"); //Verify valid CT address
         require(amountDragon_ > 100000000000000000, "Must send at least 0.1 Dragon tokens");
         require(amountCt_ > 100000000000000000, "Must send at least 0.1 Community tokens");
@@ -747,10 +762,12 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         _approve(address(this), address(uniswapV2Router), amountDragon_); //Approve main router to use our DRAGON tokens and make LP
         addLiquidityCT(amountDragon_, amountCt_, communityToken_);
         swapping = false;
+        emit SwapAndLiquify(amountDragon_,amountCt_, communityToken_);
     }
     
 
-    function seedAndBurnDragonLP(uint256 amountDragon_, uint256 amountAvax_) external payable{
+    function seedAndBurnDragonLP(uint256 amountDragon_, uint256 amountAvax_) external payable {
+        require(tradingPhase() != TOTAL_PHASES, "Phases are completed already"); //This function is just to seed LP for IDO launch
         require(msg.value == amountAvax_, "Different amount of Avax sent than indicated in call values"); //Verify intended amount sent
         require(amountDragon_ >= 100000000000000000, "Must send at least 0.1 Dragon tokens");
         require(amountAvax_ >= 100000000000000000, "Must send at least 0.1 AVAX");
@@ -760,24 +777,12 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
         _approve(address(this), address(uniswapV2Router), amountDragon_); //Approve main router to use our DRAGON tokens and make LP
         addLiquidityDRAGON(amountDragon_, amountAvax_);
         swapping = false;
-    }
-    
-
-    function setPairs() external {
-        uint256 length_ = communityTokens.length;
-        address uniswapV2Pair_;
-
-        for (uint256 i = 0; i < length_; i++){
-            uniswapV2Pair_ = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), communityTokens[i]);
-            if (!dragonCtPairs[uniswapV2Pair_]) {
-                dragonCtPairs[uniswapV2Pair_] = true;
-            }
-        }
+        emit SwapAndLiquify(amountDragon_, amountAvax_, WAVAX);
     }
 
 
     function tradingActive() public view returns (bool) { //Check if startTime happened yet to open trading
-        if (startTime > 0) {
+        if (startTime > 0  && phasesInitialized) {
             return block.timestamp >= startTime; //Return true if phases is set and has started
         } else {
             return false;
@@ -792,7 +797,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 
     function tradingPhase() public view returns (uint256 phase) { //Check the phase
         if (!tradingActive()) {
-            return 0; //0 = No public trading
+            return 0; //0 == No buying
         }
 
         uint256 secondsPastStart_ = block.timestamp - startTime;
@@ -951,11 +956,10 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
 Set values in the constructor, and constant values at the start of the contract.
 Deploy contract with solidity version: 0.8.24, EVM version: Paris, and runs optimized: 200.
 Verify contract.
-Set allowlists that we have so far for each phase.
-Approve main router and add main LP as DRAGON/AVAX pair.
-Approve main router and add some LP for each DRAGON/CT pair.
-Burn all LP tokens. All DRAGON tokens are now in LP, there are no initial team tokens or other initial distributions.
+Add all dragon tokens as LP using the functions in the contract during Phase 0, so all 8 tokens have starter LP DRAGON/CT, then run setPairs() to save the pairs.
+All DRAGON tokens are now in LP, there are no initial team tokens or other initial distributions.
 Initialize phases startTime for some future time, set whale limits per phase, and finally ***lock phases***.
+Set allowlists that we have so far for each phase.
 Set socials on block explorer and dexscreener.
 Transfer contract ownership to multisig, requiring multiple signatures per transaction, where each signer is a unique person and wallet and device.
 Release medium article showing tokenomics, audit report, DEXs, LP burnt, contract address, farm collection address, treasury address, and multisig signer addresses.
