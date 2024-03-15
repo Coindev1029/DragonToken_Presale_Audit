@@ -696,7 +696,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
             lastTimeCalled = block.timestamp;
         }
 
-        //multiply first, then divide, using () to order the operations, like (x * y) / z
+        //Multiply first, then divide, using () to order the operations, like (x * y) / z
         uint256 maxProcessFees_ = (balanceOf(uniswapV2Pair) * 8) / 100; //Cannot process fees totalling more than 8% of DRAGON in the LP at once, to reduce price dump
         uint256 contractDRAGONBalance_ = balanceOf(address(this));
         uint256 amountOfFees_; //Amount of fees to process now
@@ -716,7 +716,7 @@ contract DragonFire is ERC20, ERC20Permit, Ownable {
             
             swapping = true; //Reentrancy guard
 
-            //multiply first, then divide, using () to order the operations, like (x * y) / z
+            //Multiply first, then divide, using () to order the operations, like (x * y) / z
             uint256 swapToCtLP_ = (amountOfFees_ * communityLPFee) / totalFees; //Calculate community tokens LP fee portion
             uint256 swapToDRAGONLP_ = (amountOfFees_ * liquidityFee) / totalFees; //Calculate DRAGON LP fee portion
             uint256 farmTokens_ = (amountOfFees_ * farmFee) / totalFees; //Calculate farm fee portion
