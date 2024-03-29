@@ -70,10 +70,10 @@ interface IDragonToken{
                                                                                                                                 
 */
 
-import "@reentrancyGuard";
-import"@ownable";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract dragonPresale is ownable, reentrancyGuard{
+contract dragonPresale is Ownable, ReentrancyGuard{
 
 IDragonToken public dragonInterface;
 
@@ -88,7 +88,7 @@ uint256 public constant Ct_Lp_Dragon_Wei = 4666666620000000000000000; //Amount o
 address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
     //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
-address[] public constant Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+address[] public Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
                        //Mainnet: 
         [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
         0x420FcA0121DC28039145009570975747295f2329,
@@ -100,7 +100,7 @@ address[] public constant Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9
         0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
         //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
 
-address[] public constant CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+address[] public CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
                        //Mainnet: 
         [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -111,7 +111,8 @@ address[] public constant CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
         0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
 
-
+address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
+address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
 uint256 public ctLpCount; //Amount of CT we have already created LP for
 uint256 public airdropIndex; //Count through the airdrop array when sending out tokens
@@ -124,8 +125,6 @@ bool public dragonInitialized; //Flag to indicate when Dragon token contract has
 mapping (address => bool) public previousBuyer; //Mapping to check if presale buyer is already in the presaleBuyers array
 mapping (address => uint256) public totalSent; //Mapping to store total AVAX sent by each presale buyer
 
-address public dragonTokenAddress; //Address of the Dragon token contract to be created in the future
-address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
 
 event AvaxWithdraw(address indexed to, uint256 amount);
 event TokenWithdraw(address indexed to, uint256 amount, address indexed token);
@@ -143,7 +142,9 @@ modifier afterPresale() {
 
 
 
-constructor(Ownable(msg.sender)) { //Constructor to check initial values and set owner
+constructor()
+        Ownable(msg.sender)
+ { //Constructor to check initial values and set owner
     uint256 totalDragonAllocated = Main_Lp_Dragon_Wei + (Ct_Lp_Dragon_Wei * Total_Ct_Tokens); //Calculate total Dragon allocated for LP creation
     require(totalDragonAllocated == Half_Dragon_Supply_Wei, "Total Dragon allocated for LP must equal to half of the total supply");
     require(Airdrop_Time >= (Presale_End_Time + 2 hours), "Airdrop time must be at least 2 hours after presale end time, to give time for LP creation and IDO phases to complete first");
@@ -160,28 +161,29 @@ constructor(Ownable(msg.sender)) { //Constructor to check initial values and set
 
 
 
-function seedLp() public nonnreentrant { //This must be called after the presale ends to create the LP. It must be called 9 times, once for each CT address, plus the Dragon token address.
+function seedLp() public nonReentrant { //This must be called after the presale ends to create the LP. It must be called 9 times, once for each CT address, plus the Dragon token address.
     require(!lpCreated, "All LP has already been seeded");
     require(block.timestamp > Presale_End_Time, "Presale has not ended yet");
 
     if (ctLpCount == Total_Ct_Tokens) { //If all CT LP is made already then make main DRAGON/AVAX LP lastly
         uint256 lpAvax_ = ((totalAvaxPresale * 84) / 100); //Use 84% of total AVAX received for main DRAGON/AVAX LP creation
-        require(dragonInterface.seedAndBurnDragonLP(Main_Lp_Dragon_Wei, lpAvax_), "Main LP creation failed"){value: lpAvax_};
+        dragonInterface.seedAndBurnDragonLP{value: lpAvax_}(Main_Lp_Dragon_Wei, lpAvax_);
         lpCreated = true;
     } else {
-        avaxAmount_ = ((totalAvaxPresale * 2) / 100); //Use 2% of total AVAX received per CT LP creation, for 8 tokens this will total 16%
+        uint256 avaxAmount_ = ((totalAvaxPresale * 2) / 100); //Use 2% of total AVAX received per CT LP creation, for 8 tokens this will total 16%
         uint256 ctBalanceBefore = IERC20Token(Community_Tokens[ctLpCount]).balanceOf(address(this));
         swapAvaxForCT(avaxAmount_, ctLpCount);
         uint256 ctBalanceAfter = IERC20Token(Community_Tokens[ctLpCount]).balanceOf(address(this));
-        uint256 ctLpTokens_ = ctBalanceAfter - ctBalanceBefore;
-        require(IERC20Token(Community_Tokens[ctLpCount]).approve(dragonAddress, lpTokens), "Approval failed");
-        require(dragonInterface.seedAndBurnCtLP{value: avaxAmount_}(ctLpCount, Community_Tokens[ctLpCount], Ct_Lp_Dragon_Wei, ctLpTokens_), "CT LP creation failed");
+        uint256 ctLpTokens_ = ctBalanceAfter - ctBalanceBefore; //Calculate CT tokens received in swap
+        require(IERC20Token(Community_Tokens[ctLpCount]).approve(dragonAddress, ctLpTokens_), "Approval failed");
+        dragonInterface.seedAndBurnCtLP(ctLpCount, Community_Tokens[ctLpCount], Ct_Lp_Dragon_Wei, ctLpTokens_);
         ctLpCount++;
     }
+    emit LPSeeded(msg.sender);
 }
 
 
-function airdropBuyers() public nonreentrant {
+function airdropBuyers() external nonReentrant {
     require(!airdropCompleted, "Airdrop has already been completed");
     require(block.timestamp >= Airdrop_Time, "It is not yet time to send out presale tokens");
     _airdrop();
@@ -192,7 +194,7 @@ function airdropBuyers() public nonreentrant {
 //Internal functions
 
 
-function _airdrop() internal {
+function _airdrop() private {
     uint256 limitCount_ = airdropIndex + 100; //Max amount of addresses to airdrop to per call is 100 addresses
     address buyer_;
     uint256 amount_;
@@ -200,7 +202,7 @@ function _airdrop() internal {
     while(airdropIndex < presaleBuyers.length && airdropIndex < limitCount_) {
         buyer_ = presaleBuyers[airdropIndex];
         amount_ = (totalSent[buyer_] * Half_Dragon_Supply_Wei) / totalAvaxPresale; //Calculate amount of Dragon tokens to send to buyer as ratio of AVAX sent
-        require(dragonInterface.transfer(buyer, amount), "Transfer failed");
+        require(dragonInterface.transfer(buyer_, amount_), "Transfer failed");
         airdropIndex++;
     }
 
@@ -231,33 +233,12 @@ function _airdrop() internal {
     }
     
 
-
-//Owner functions
-
-
-function setDragonInterface(address _dragonTokenAddress) public onlyOwner { //Starts the presale by setting the Dragon token contract address
-    dragonInterface = IDragonToken(_dragonTokenAddress);
-    dragonTokenAddress = _dragonTokenAddress;
-    dragonInitialized = true;
-    emit DragonInterfaceSet(msg.sender);
-}
-
-
-
-    //Fallback functions:
-
-
-    fallback() external payable {  //Fallback function to receive AVAX sent to the contract
-        receive(); 
-    }
-
-receive() public payable { //This fallback function is used to receive AVAX from users for the presale
+function buyPresale(uint256 amount_, address buyer_) private { //This function must be very gas efficient, as a standard AVAX transfer only includes 21000 gas
     require(block.timestamp < Presale_End_Time, "Presale has already ended");
-    require(dragonTokenAddress != address(0), "Dragon token address has not yet been set");
-    require(msg.value >= Minimum_Buy_Wei, "Minimum buy not met");
-    address buyer_ = msg.sender;
-    totalSent[buyer_]+= msg.value;
-    totalAvaxPresale+= msg.value;
+    require(dragonAddress != address(0), "Dragon token address has not yet been set");
+    require(amount_ >= Minimum_Buy_Wei, "Minimum buy of 1 AVAX per transaction; Not enough AVAX sent");
+    totalSent[buyer_]+= amount_;
+    totalAvaxPresale+= amount_;
 
     if (!previousBuyer[buyer_]) { //Add buyer to the presaleBuyers array if they are not already in it
         previousBuyer[buyer_] = true;
@@ -265,6 +246,32 @@ receive() public payable { //This fallback function is used to receive AVAX from
         emit BuyerAdded(buyer_);
     }
 }
+
+
+
+    //Fallback functions:
+
+
+    fallback() external payable {  //This function is used to receive AVAX from users for the presale
+        buyPresale(msg.value, msg.sender); 
+    }
+
+receive() external payable { //This function is used to receive AVAX from users for the presale
+        buyPresale(msg.value, msg.sender); 
+}
+
+
+
+//Owner functions
+
+
+function setDragonInterface(address _dragonAddress) public onlyOwner { //Starts the presale by setting the Dragon token contract address
+    dragonInterface = IDragonToken(_dragonAddress);
+    dragonAddress = _dragonAddress;
+    dragonInitialized = true;
+    emit DragonInterfaceSet(msg.sender);
+}
+
 
 
 
