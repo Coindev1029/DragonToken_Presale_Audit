@@ -80,8 +80,8 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     IDragonToken public dragonInterface;
 
     uint256 public constant Minimum_Buy_Wei = 1000000000000000000; //1 AVAX
-    uint256 public  Presale_End_Time = 1791775312; //Date presale ends, a day before IDO phased launch so time to make LP
-    uint256 public  Airdrop_Time = 1811775312; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
+    uint256 public  Presale_End_Time = 171177900; //Date presale ends, a day before IDO phased launch so time to make LP
+    uint256 public  Airdrop_Time = 1811774170; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
     uint256 public constant totalDragonReceived = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
     uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000;
@@ -94,8 +94,8 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
         //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
-    address[] public Community_Tokens = [0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
-    /*                    //Mainnet: 
+    address[] public Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+                        //Mainnet: 
             [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
             0x420FcA0121DC28039145009570975747295f2329,
             0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
@@ -105,9 +105,9 @@ contract dragonPresale is Ownable, ReentrancyGuard {
             0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
             0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
             //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-    */
-    address[] public CT_Routers = [0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
-    /*                    //Mainnet: 
+
+    address[] public CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+                        //Mainnet: 
             [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -116,7 +116,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-    */
+
     address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
     address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
@@ -165,7 +165,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     //Public functions
 
 
-    function seedLp() public nonReentrant { //This must be called after the presale ends to create the LP. It must be called 9 times, once for each CT address, plus the Dragon token address.
+    function seedLP() public nonReentrant { //This must be called after the presale ends to create the LP. It must be called 9 times, once for each CT address, plus the Dragon token address.
         require(!lpCreated, "All LP has already been seeded");
         require(block.timestamp > Presale_End_Time, "Presale has not ended yet");
 
@@ -193,10 +193,6 @@ contract dragonPresale is Ownable, ReentrancyGuard {
         _airdrop();
     }
 
-
-    function numberOfPresalers() external view returns(uint256){
-        return (presaleBuyers.length);
-    }
 
 
     //Internal functions
@@ -330,7 +326,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
 
     //Test functions:
 
-    //Delete this before production deployment, and add back "constant" to the Presale_End_Time and Airdrop_Time variables
+    //Delete this before production deployment, and add back constant to the Presale_End_Time and Airdrop_Time variables
     function setPresaleTimes(uint256 endTime_, uint256 airdropTime_) public onlyOwner { //unchecked test function to set presale times
         if( endTime_ > 0) {
             Presale_End_Time = endTime_;
@@ -347,7 +343,17 @@ contract dragonPresale is Ownable, ReentrancyGuard {
 }
 
 //Launch notes:
-//Dragon token contract must mint tokens to this contract when Dragon contract is deployed, by setting this contract's address as the receiver.
-//We also need to set to no taxes for this contract address in the constructor so airdrop is not taxed.
-//Dev needs to call setDragonInterface with the newly deployed Dragon token contract address before presale.
-//After LP is seeded then dev can call setPairs() in the Dragon token contract, so that LP can be directly added and so DRAGON tokens can be sold into those pairs during the phased IDO launch.
+
+//0. Delete the test functions and set the Presale_End_Time and Airdrop_Time variables back to constants.
+//1. Set the variables at the beginning of the contract to the correct values for the presale.
+//2. Deploy the presale contract.
+//3. Deploy the Dragon token contract, minting tokens directly to the presale contract address, and setting no taxes for presale contract address, in the constructor.
+//4. Call setDragonInterface with the Dragon token contract address in the presale contract. This starts the presale.
+//5. After presale ends, call seedLP() 9 times, once for each CT address, and then once for the main LP.
+//6. After LP is seeded, call setPairs() in the Dragon token contract.
+//7. After the IDO phased launch is complete, call airdropBuyers() repeatedly in the presale contract to send out all the airdrop tokens to presale buyers.
+//8. After airdrop is complete, call withdrawAvaxTo() to withdraw any remaining AVAX to the owner address.
+//9. Call the iERC20TransferFrom() functions to send out any remaining tokens to the owner address.
+//10. Call the iERC721TransferFrom() functions to send out any remaining NFTs to the owner address.
+
+
