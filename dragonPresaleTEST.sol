@@ -356,6 +356,3 @@ contract dragonPresale is Ownable, ReentrancyGuard {
 //5. After presale ends, call seedLP() 9 times, once for each CT address, and then once for the main LP.
 //6. After LP is seeded, call setPairs() in the Dragon token contract.
 //7. After the IDO phased launch is complete, call airdropBuyers() repeatedly in the presale contract to send out all the airdrop tokens to presale buyers.
-//8. After airdrop is complete, call withdrawAvaxTo() to withdraw any remaining AVAX to the owner address.
-//9. Call the iERC20TransferFrom() functions to send out any remaining tokens to the owner address.
-//10. Call the iERC721TransferFrom() functions to send out any remaining NFTs to the owner address.
