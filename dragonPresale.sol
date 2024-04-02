@@ -1,8 +1,8 @@
 //This is a presale contract for the $DRAGON token.
 //Users can transfer AVAX directly to this contract address during the presale time window.
 //There is a minimum presale buy in amount of 1 AVAX per transfer.
-//LP to be trustlessly created after the presale ends, using half of the $DRAGON supply and all of the presale counted AVAX.
-//Presale buyers' tokens to be trustlessly "airdropped" out after presale ends, aka sent directly to them, and after the IDO phased launch.
+//LP to be trustlessly created after the presale ends, using half of the $DRAGON supply and all of the presale AVAX.
+//Presale buyers' tokens to be trustlessly "airdropped" out after presale ends, aka sent directly to them, after the IDO phased launch.
 //Note: There are no whale limits or allowlists for this presale.
 
 
