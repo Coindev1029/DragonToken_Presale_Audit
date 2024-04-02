@@ -80,8 +80,8 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     IDragonToken public dragonInterface;
 
     uint256 public constant Minimum_Buy_Wei = 1000000000000000000; //1 AVAX
-    uint256 public  Presale_End_Time = 171177900; //Date presale ends, a day before IDO phased launch so time to make LP
-    uint256 public  Airdrop_Time = 1811774170; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
+    uint256 public  Presale_End_Time = 1791775312; //Date presale ends, a day before IDO phased launch so time to make LP
+    uint256 public  Airdrop_Time = 1811775312; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
     uint256 public constant totalDragonReceived = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
     uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000;
@@ -94,8 +94,8 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
         //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
-    address[] public Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
-                        //Mainnet: 
+    address[] public Community_Tokens = [0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+    /*                    //Mainnet: 
             [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
             0x420FcA0121DC28039145009570975747295f2329,
             0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
@@ -105,9 +105,9 @@ contract dragonPresale is Ownable, ReentrancyGuard {
             0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
             0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
             //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-
-    address[] public CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
-                        //Mainnet: 
+    */
+    address[] public CT_Routers = [0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+    /*                    //Mainnet: 
             [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -116,7 +116,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-
+    */
     address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
     address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
@@ -193,6 +193,10 @@ contract dragonPresale is Ownable, ReentrancyGuard {
         _airdrop();
     }
 
+
+    function numberOfPresalers() external view returns(uint256){
+        return (presaleBuyers.length);
+    }
 
 
     //Internal functions
@@ -355,5 +359,3 @@ contract dragonPresale is Ownable, ReentrancyGuard {
 //8. After airdrop is complete, call withdrawAvaxTo() to withdraw any remaining AVAX to the owner address.
 //9. Call the iERC20TransferFrom() functions to send out any remaining tokens to the owner address.
 //10. Call the iERC721TransferFrom() functions to send out any remaining NFTs to the owner address.
-
-
