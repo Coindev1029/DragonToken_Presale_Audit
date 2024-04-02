@@ -80,8 +80,8 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     IDragonToken public dragonInterface;
 
     uint256 public constant Minimum_Buy_Wei = 1000000000000000000; //1 AVAX
-    uint256 public  Presale_End_Time = 1791775312; //Date presale ends, a day before IDO phased launch so time to make LP
-    uint256 public  Airdrop_Time = 1811775312; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
+    uint256 public constant Presale_End_Time = 1791775312; //Date presale ends, a day before IDO phased launch so time to make LP
+    uint256 public constant Airdrop_Time = 1811775312; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
     uint256 public constant Total_Dragon_Received = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
     uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
@@ -355,7 +355,7 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     }
 
 
-
+/*
     //Test functions:
 
     //Delete this before production deployment, and add back constant to the Presale_End_Time and Airdrop_Time variables
@@ -372,11 +372,19 @@ contract DragonPresale is Ownable, ReentrancyGuard {
             Airdrop_Time = block.timestamp;
         }
     }
+*/
+
+
+
 }
+
+
+
 
 //Launch notes:
 
-//0. Delete the test functions and set the Presale_End_Time and Airdrop_Time variables back to constants.
+//0. Delete the test functions and set the Presale_End_Time and Airdrop_Time variables back to constants if needed.
+
 //1. Set the variables at the beginning of the contract to the correct values for the presale.
 //2. Deploy the presale contract.
 //3. Deploy the Dragon token contract, minting tokens directly to the presale contract address, and setting no taxes for presale contract address, in the constructor.
