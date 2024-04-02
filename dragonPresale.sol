@@ -95,9 +95,20 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
         //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
-    address[] public Community_Tokens = //[0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846]; //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846 
+    address[] public Community_Tokens = 
+            //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846
+        [0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846    
+        ];  
+
                         //Mainnet: 
-            [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
+/*            [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
             0x420FcA0121DC28039145009570975747295f2329,
             0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
             0xb5Cc2CE99B3f98a969DBe458b96a117680AE0fA1,
@@ -106,10 +117,20 @@ contract DragonPresale is Ownable, ReentrancyGuard {
             0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
             0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
             //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-    
-    address[] public CT_Routers = //[0xf8e81D47203A594245E36C48e151709F0C19fBe8]; //Fuji Testnet: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+*/    
+    address[] public CT_Routers = 
+        //Fuji Testnet TJ Router: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
+        [0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
+        0xf8e81D47203A594245E36C48e151709F0C19fBe8
+        ]; 
                         //Mainnet: 
-            [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+/*            [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -117,7 +138,7 @@ contract DragonPresale is Ownable, ReentrancyGuard {
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-    
+*/    
     address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
     address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
@@ -261,10 +282,12 @@ contract DragonPresale is Ownable, ReentrancyGuard {
 
     //Fallback functions:
 
-
+    
+    //The user's wallet will add extra gas when transferring Avax to the fallback functions, so we are not restricted to only sending an event here.
     fallback() external payable {  //This function is used to receive AVAX from users for the presale
         buyPresale(msg.value, msg.sender); 
     }
+
 
     receive() external payable { //This function is used to receive AVAX from users for the presale
         buyPresale(msg.value, msg.sender); 
@@ -340,13 +363,13 @@ contract DragonPresale is Ownable, ReentrancyGuard {
         if( endTime_ > 0) {
             Presale_End_Time = endTime_;
         } else {
-            Presale_End_Time = block.timestamp + 1 minutes;
+            Presale_End_Time = block.timestamp - 1 minutes;
         }
         
         if( airdropTime_ > 0) {
             Airdrop_Time = airdropTime_;
         } else {
-            Airdrop_Time = block.timestamp + 2 minutes;
+            Airdrop_Time = block.timestamp;
         }
     }
 }
@@ -358,6 +381,6 @@ contract DragonPresale is Ownable, ReentrancyGuard {
 //2. Deploy the presale contract.
 //3. Deploy the Dragon token contract, minting tokens directly to the presale contract address, and setting no taxes for presale contract address, in the constructor.
 //4. Call setDragonInterface with the Dragon token contract address in the presale contract. This starts the presale.
-//5. After presale ends, call seedLP() 9 times, once for each CT address, and then once for the main LP.
+//5. After presale ends, call seedLP() 9 times, once for each CT address, and then once for the main LP. Note it buys CT on TJ dex and makes LP on Quest dex.
 //6. After LP is seeded, call setPairs() in the Dragon token contract.
 //7. After the IDO phased launch is complete, call airdropBuyers() repeatedly in the presale contract to send out all the airdrop tokens to presale buyers.
