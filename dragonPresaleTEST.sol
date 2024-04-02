@@ -82,10 +82,11 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     uint256 public constant Minimum_Buy_Wei = 1000000000000000000; //1 AVAX
     uint256 public  Presale_End_Time = 1791775312; //Date presale ends, a day before IDO phased launch so time to make LP
     uint256 public  Airdrop_Time = 1811775312; //Date airdrop starts, immediately after IDO phased launch so can transfer tokens without whale limits
-    uint256 public constant totalDragonReceived = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
+    uint256 public constant Total_Dragon_Received = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
-    uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000;
-
+    uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
+    uint256 public constant Dragon_Lp_Percentage = 84;  //Percentage of total AVAX received to be used for main LP creation, 84% of total AVAX received
+    uint256 public constant Ct_Lp_Percentage = 2; //Percentage of total AVAX received to be used for each CT LP creation, 8 CT * 2% of total AVAX received per CT LP, 16% total
     uint256 public constant Main_Lp_Dragon_Wei = 37333332960000000000000000; //Amount of $DRAGON to be used for LP creation, 44444444 * 84% = 37,333,332.96 tokens
     uint256 public constant Total_Ct_Tokens = 8; //Total number of Communty Tokens addresses, aka CT, to create LP for
     uint256 public constant Ct_Lp_Dragon_Wei = 888888880000000000000000; //Amount of $DRAGON to be used for each CT LP creation, 
@@ -120,7 +121,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
     address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
-    uint256 public ctLpCount; //Amount of CT we have already created LP for
+    uint256 public ctLpIndex; //Amount of CT we have already created LP for
     uint256 public airdropIndex; //Count through the airdrop array when sending out tokens
     uint256 public totalAvaxPresale; //Total AVAX received during presale
 
@@ -165,25 +166,30 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     //Public functions
 
 
-    function seedLP() public nonReentrant { //This must be called after the presale ends to create the LP. It must be called 9 times, once for each CT address, plus the Dragon token address.
+    function seedLP() public nonReentrant { //This must be called 9 times, after the presale ends; Once for each CT address, plus the Dragon token address.
         require(!lpCreated, "All LP has already been seeded");
         require(block.timestamp > Presale_End_Time, "Presale has not ended yet");
 
-        if (ctLpCount == Total_Ct_Tokens) { //If all CT LP is made already then make main DRAGON/AVAX LP lastly
-            uint256 lpAvax_ = ((totalAvaxPresale * 84) / 100); //Use 84% of total AVAX received for main DRAGON/AVAX LP creation
+        if (ctLpIndex == Total_Ct_Tokens) { //If all CT LP is made already then make main DRAGON/AVAX LP lastly
+            uint256 lpAvax_ = ((totalAvaxPresale * Dragon_Lp_Percentage) / 100); //Use 84% of total AVAX received for main DRAGON/AVAX LP creation
             dragonInterface.seedAndBurnDragonLP{value: lpAvax_}(Main_Lp_Dragon_Wei, lpAvax_);
             lpCreated = true;
         } else {
-            uint256 avaxAmount_ = ((totalAvaxPresale * 2) / 100); //Use 2% of total AVAX received per CT LP creation, for 8 tokens this will total 16%
-            uint256 ctBalanceBefore = IERC20Token(Community_Tokens[ctLpCount]).balanceOf(address(this));
-            swapAvaxForCT(avaxAmount_, ctLpCount);
-            uint256 ctBalanceAfter = IERC20Token(Community_Tokens[ctLpCount]).balanceOf(address(this));
+            uint256 avaxAmount_ = ((totalAvaxPresale * Ct_Lp_Percentage) / 100); //Use 2% of total AVAX received per CT LP creation, for 8 tokens this will total 16%
+            uint256 ctBalanceBefore = IERC20Token(Community_Tokens[ctLpIndex]).balanceOf(address(this));
+            swapAvaxForCT(avaxAmount_, ctLpIndex);
+            uint256 ctBalanceAfter = IERC20Token(Community_Tokens[ctLpIndex]).balanceOf(address(this));
             uint256 ctLpTokens_ = ctBalanceAfter - ctBalanceBefore; //Calculate CT tokens received in swap
-            require(IERC20Token(Community_Tokens[ctLpCount]).approve(dragonAddress, ctLpTokens_), "Approval failed");
-            dragonInterface.seedAndBurnCtLP(ctLpCount, Community_Tokens[ctLpCount], Ct_Lp_Dragon_Wei, ctLpTokens_);
-            ctLpCount++;
+            require(IERC20Token(Community_Tokens[ctLpIndex]).approve(dragonAddress, ctLpTokens_), "Approval failed");
+            dragonInterface.seedAndBurnCtLP(ctLpIndex, Community_Tokens[ctLpIndex], Ct_Lp_Dragon_Wei, ctLpTokens_);
+            ctLpIndex++; //Increment counter so that a new CT token will be seeded LP the next time this function is called
         }
         emit LPSeeded(msg.sender);
+    }
+
+
+    function numberOfPresalers() external view returns(uint256){
+        return (presaleBuyers.length);
     }
 
 
@@ -193,10 +199,6 @@ contract dragonPresale is Ownable, ReentrancyGuard {
         _airdrop();
     }
 
-
-    function numberOfPresalers() external view returns(uint256){
-        return (presaleBuyers.length);
-    }
 
 
     //Internal functions
@@ -230,7 +232,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
         try  
         IUniswapV2Router02(CT_Routers[index_]).swapExactAVAXForTokensSupportingFeeOnTransferTokens //AVAX to CT, swap on dex router with most LP
         {value: avaxAmount_}(
-            100, //Infinite slippage basically since it's in wei
+            100, //Infinite slippage basically since it's in Wei
             path,
             address(this), //Send CT tokens received to this contract
             block.timestamp)
@@ -241,7 +243,7 @@ contract dragonPresale is Ownable, ReentrancyGuard {
     }
     
 
-    function buyPresale(uint256 amount_, address buyer_) private { //This function must be very gas efficient, as a standard AVAX transfer only includes 21000 gas
+    function buyPresale(uint256 amount_, address buyer_) private {
         require(block.timestamp < Presale_End_Time, "Presale has already ended");
         require(dragonAddress != address(0), "Dragon token address has not yet been set");
         require(amount_ >= Minimum_Buy_Wei, "Minimum buy of 1 AVAX per transaction; Not enough AVAX sent");
@@ -281,6 +283,9 @@ contract dragonPresale is Ownable, ReentrancyGuard {
         emit DragonInterfaceSet(msg.sender);
     }
 
+
+    //Emergency withdraw functions:
+    
 
     function withdrawAvaxTo(address payable to_, uint256 amount_) external onlyOwner afterPresale{
         require(to_ != address(0), "Cannot withdraw to 0 address");
