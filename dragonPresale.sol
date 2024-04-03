@@ -85,30 +85,23 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     uint256 public constant Total_Dragon_Received = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
     uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
-    uint256 public constant Dragon_Lp_Percentage = 84;  //Percentage of total AVAX received to be used for main LP creation, 84% of total AVAX received
-    uint256 public constant Ct_Lp_Percentage = 2; //Percentage of total AVAX received to be used for each CT LP creation, 8 CT * 2% of total AVAX received per CT LP, 16% total
-    uint256 public constant Main_Lp_Dragon_Wei = 37333332960000000000000000; //Amount of $DRAGON to be used for LP creation, 44444444 * 84% = 37,333,332.96 tokens
-    uint256 public constant Total_Ct_Tokens = 8; //Total number of Communty Tokens addresses, aka CT, to create LP for
-    uint256 public constant Ct_Lp_Dragon_Wei = 888888880000000000000000; //Amount of $DRAGON to be used for each CT LP creation, 
+    uint256 public constant Dragon_Lp_Percentage = 96;  //Percentage of total AVAX received to be used for main LP creation, 84% of total AVAX received
+    uint256 public constant Total_Ct_Tokens = 2; //Total number of Communty Tokens addresses, aka CT, to create LP for
+    uint256 public constant Total_Ct_Lp_Percentage = 4;
+    uint256 public constant Ct_Lp_Percentage = (Total_Ct_Lp_Percentage / Total_Ct_Tokens); //Percentage of AVAX to be used for each CT LP creation, 8 CT * 2% of AVAX received to be used per CT LP, 16% total.
+    uint256 public constant Main_Lp_Dragon_Wei = ((LP_Dragon_Supply_Wei * Dragon_Lp_Percentage) / 100); //Amount of $DRAGON to be used for LP creation, 44444444 * 84% = 37,333,332.96 tokens
+    uint256 public constant Ct_Lp_Dragon_Wei = ((LP_Dragon_Supply_Wei - Main_Lp_Dragon_Wei) / Total_Ct_Tokens); //Amount of $DRAGON to be used for each CT LP creation, 
     //44444444 half tokens - 37,333,332.96 main LP = 7,111,111.04 CT LP total / 8 CTs = 888,888.88 $DRAGON per CT LP aka 1% of total supply or 2% of half supply per LP
 
-    address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7; 
+    address public constant WAVAX = 0xd00ae08403B9bbb9124bB305C09058E32C39A48c; 
         //WAVAX Mainnet: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7 ; Fuji: 0xd00ae08403B9bbb9124bB305C09058E32C39A48c
 
     address[] public Community_Tokens = 
             //FUJI Testnet Chainlink: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846
-        [0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
-        0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846    
-        ];  
-
+/*        [0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846];  
+*/
                         //Mainnet: 
-/*            [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
+            [0xab592d197ACc575D16C3346f4EB70C703F308D1E,
             0x420FcA0121DC28039145009570975747295f2329,
             0x184ff13B3EBCB25Be44e860163A5D8391Dd568c1,
             0xb5Cc2CE99B3f98a969DBe458b96a117680AE0fA1,
@@ -117,20 +110,13 @@ contract DragonPresale is Ownable, ReentrancyGuard {
             0x69260B9483F9871ca57f81A90D91E2F96c2Cd11d,
             0x96E1056a8814De39c8c3Cd0176042d6ceCD807d7];    
             //FEED//COQ//KIMBO//LUCKY//DWC//SQRCAT//GGP//OSAK//
-*/    
+    
     address[] public CT_Routers = 
         //Fuji Testnet TJ Router: 0xd7f655E3376cE2D7A2b08fF01Eb3B1023191A901
-        [0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8,
-        0xf8e81D47203A594245E36C48e151709F0C19fBe8
-        ]; 
+/*        [0x3b014c0307Ad9dc4262F1696BC463Fd3c6dC4679]; 
+*/
                         //Mainnet: 
-/*            [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
+            [0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
@@ -138,7 +124,7 @@ contract DragonPresale is Ownable, ReentrancyGuard {
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4,
             0x60aE616a2155Ee3d9A68541Ba4544862310933d4];    //(TraderJoe has best liquidity for each CT LP currently)
-*/    
+    
     address[] public presaleBuyers = new address[](0); //Array to store presale buyers addresses to send tokens to later
     address public dragonAddress; //Address of the Dragon token contract to be created in the future
 
@@ -299,6 +285,7 @@ contract DragonPresale is Ownable, ReentrancyGuard {
 
 
     function setDragonInterface(address _dragonAddress) public onlyOwner { //Starts the presale by setting the Dragon token contract address
+        require(_dragonAddress != address(0), "Cannot set the 0 address as the Dragon Address");
         require(dragonAddress == address(0), "$DRAGON address has already been set");
         dragonInterface = IDragonToken(_dragonAddress);
         dragonAddress = _dragonAddress;
@@ -355,35 +342,40 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     }
 
 
-/*
-    //Test functions:
-
-    //Delete this before production deployment, and add back constant to the Presale_End_Time and Airdrop_Time variables
-    function setPresaleTimes(uint256 endTime_, uint256 airdropTime_) public onlyOwner { //unchecked test function to set presale times
-        if( endTime_ > 0) {
-            Presale_End_Time = endTime_;
-        } else {
-            Presale_End_Time = block.timestamp - 1 minutes;
-        }
-        
-        if( airdropTime_ > 0) {
-            Airdrop_Time = airdropTime_;
-        } else {
-            Airdrop_Time = block.timestamp;
-        }
-    }
-*/
-
-
 
 }
+
+
+//"May the dragon's song bring harmony." -Harmony Scales
+
+
+
+
+  //Legal Disclaimer: 
+// DragonFire (DRAGON) is a meme coin (also known as a community token) created for entertainment purposes only. 
+//It holds no intrinsic value and should not be viewed as an investment opportunity or a financial instrument.
+//It is not a security, as it promises no financial returns to buyers, and does not rely solely on the efforts of the creators and developers.
+
+// There is no formal development team behind DRAGON, and it lacks a structured roadmap. 
+//Users should understand that the project is experimental and may undergo changes or discontinuation without prior notice.
+
+// DRAGON serves as a platform for the community to engage in activities such as liquidity provision and token swapping on the Avalanche blockchain. 
+//It aims to foster community engagement and collaboration, allowing users to participate in activities that may impact the value of their respective tokens.
+
+// It's important to note that the value of DRAGON and associated community tokens may be subject to significant volatility and speculative trading. 
+//Users should exercise caution and conduct their own research before engaging with DRAGON or related activities.
+
+// Participation in DRAGON-related activities should not be solely reliant on the actions or guidance of developers. 
+//Users are encouraged to take personal responsibility for their involvement and decisions within the DRAGON ecosystem.
+
+// By interacting with DRAGON or participating in its associated activities, 
+//users acknowledge and accept the inherent risks involved and agree to hold harmless the creators and developers of DRAGON from any liabilities or losses incurred.
+
 
 
 
 
 //Launch notes:
-
-//0. Delete the test functions and set the Presale_End_Time and Airdrop_Time variables back to constants if needed.
 
 //1. Set the variables at the beginning of the contract to the correct values for the presale.
 //2. Deploy the presale contract.
