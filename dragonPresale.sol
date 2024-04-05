@@ -85,9 +85,9 @@ contract DragonPresale is Ownable, ReentrancyGuard {
     uint256 public constant Total_Dragon_Received = 88888888000000000000000000; //Total $DRAGON minted into the contract which in this case is 100% of total $DRAGON supply
     uint256 public constant LP_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
     uint256 public constant Presalers_Dragon_Supply_Wei = 44444444000000000000000000; //Total supply of $DRAGON is 88888888, split 50% for LP and 50% presale buyers
-    uint256 public constant Dragon_Lp_Percentage = 96;  //Percentage of total AVAX received to be used for main LP creation, 84% of total AVAX received
-    uint256 public constant Total_Ct_Tokens = 2; //Total number of Communty Tokens addresses, aka CT, to create LP for
-    uint256 public constant Total_Ct_Lp_Percentage = 4;
+    uint256 public constant Dragon_Lp_Percentage = 84;  //Percentage of total AVAX received to be used for main LP creation, 84% of total AVAX received
+    uint256 public constant Total_Ct_Tokens = 8; //Total number of Communty Tokens addresses, aka CT, to create LP for
+    uint256 public constant Total_Ct_Lp_Percentage = 16;
     uint256 public constant Ct_Lp_Percentage = (Total_Ct_Lp_Percentage / Total_Ct_Tokens); //Percentage of AVAX to be used for each CT LP creation, 8 CT * 2% of AVAX received to be used per CT LP, 16% total.
     uint256 public constant Main_Lp_Dragon_Wei = ((LP_Dragon_Supply_Wei * Dragon_Lp_Percentage) / 100); //Amount of $DRAGON to be used for LP creation, 44444444 * 84% = 37,333,332.96 tokens
     uint256 public constant Ct_Lp_Dragon_Wei = ((LP_Dragon_Supply_Wei - Main_Lp_Dragon_Wei) / Total_Ct_Tokens); //Amount of $DRAGON to be used for each CT LP creation, 
